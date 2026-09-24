@@ -1,0 +1,135 @@
+/* 
+================================================================================
+ADDITIONAL FEATURE SCRIPT 06: PROACTIVE EARLY WARNING & AUTOMATED PARENT ALERT ENGINE
+================================================================================
+Module: Scheduled Automation / Custom Function across Students, Attendance, Marks & Fees
+Purpose:
+  1. Identifies "At-Risk" students across 3 key operational dimensions:
+     a) Attendance Risk: Attendance Percentage < 75.0%
+     b) Academic Risk: Failing grade (< 40%) in any subject or cumulative GPA 'F'
+     c) Financial Risk: Fee status 'Overdue' with outstanding balance > 0
+  2. Automatically flags student records and computes a composite Student Health Score (0 - 100).
+  3. Dispatches targeted HTML SMS/Email notifications to parents with dynamic resolution links.
+  4. Generates an executive daily "At-Risk Digest" for School Leadership and Class Teachers.
+================================================================================
+*/
+
+// Step 1: Query Active Students
+activeStudents = zoho.crm.searchRecords("Students", "(Student_Status:equals:Active)");
+
+atRiskList = List();
+atRiskCount = 0;
+
+if (activeStudents != null && activeStudents.size() > 0) {
+    for each student in activeStudents {
+        stuId = student.get("id").toLong();
+        stuCode = student.get("Student_ID");
+        stuName = student.get("Name");
+        parentEmail = student.get("Parent_Email");
+        parentName = student.get("Parent_Name");
+        
+        attPct = ifNull(student.get("Attendance_Percentage"), 100.0).toDecimal();
+        overallGrade = ifNull(student.get("Overall_Grade"), "A");
+        feeStatus = ifNull(student.get("Fee_Status"), "Paid");
+        feeBalance = ifNull(student.get("Outstanding_Fee_Balance"), 0.0).toDecimal();
+        
+        // Evaluate Risk Indicators
+        isAttendanceRisk = (attPct < 75.0);
+        isAcademicRisk = (overallGrade == "F");
+        isFinancialRisk = (feeStatus == "Overdue" && feeBalance > 0.0);
+        
+        // Calculate Composite Health Score (100 = Perfect)
+        healthScore = 100.0;
+        if (isAttendanceRisk) {
+            healthScore = healthScore - 30.0;
+        }
+        if (isAcademicRisk) {
+            healthScore = healthScore - 35.0;
+        }
+        if (isFinancialRisk) {
+            healthScore = healthScore - 25.0;
+        }
+        if (healthScore < 0.0) {
+            healthScore = 0.0;
+        }
+        
+        // Is At-Risk if score < 70 or any critical flag triggered
+        isAtRisk = (isAttendanceRisk || isAcademicRisk || isFinancialRisk);
+        
+        if (isAtRisk) {
+            atRiskCount = atRiskCount + 1;
+            
+            // Build Risk Causes Description
+            causesList = List();
+            if (isAttendanceRisk) {
+                causesList.add("Low Attendance (" + attPct + "%)");
+            }
+            if (isAcademicRisk) {
+                causesList.add("Failing Academic Grade (" + overallGrade + ")");
+            }
+            if (isFinancialRisk) {
+                causesList.add("Overdue Fees (Rs. " + feeBalance + ")");
+            }
+            riskSummary = causesList.toString();
+            
+            // Update Student Record in CRM
+            updMap = Map();
+            updMap.put("At_Risk_Flag", true);
+            updMap.put("Student_Health_Score", healthScore);
+            updMap.put("Risk_Summary", riskSummary);
+            zoho.crm.updateRecord("Students", stuId, updMap);
+            
+            // Collect for Management Digest Report
+            summaryItem = Map();
+            summaryItem.put("ID", stuCode);
+            summaryItem.put("Name", stuName);
+            summaryItem.put("Causes", riskSummary);
+            summaryItem.put("Score", healthScore);
+            atRiskList.add(summaryItem);
+            
+            // Step 2: Send Proactive HTML Notification to Parent
+            if (parentEmail != "") {
+                emailSubject = "IMPORTANT NOTICE: Student Academic & Attendance Progress Update (" + stuCode + ")";
+                
+                emailBody = "<html><body style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>"
+                    + "<div style='max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;'>"
+                    + "<div style='background-color: #d9534f; color: #fff; padding: 16px; text-align: center;'>"
+                    + "<h2 style='margin:0;'>Student Progress Alert</h2>"
+                    + "</div>"
+                    + "<div style='padding: 20px;'>"
+                    + "<p>Dear <b>" + parentName + "</b>,</p>"
+                    + "<p>We are contacting you regarding your child <b>" + stuName + "</b> (ID: <code>" + stuCode + "</code>).</p>"
+                    + "<div style='background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0;'>"
+                    + "<strong>Attention Required:</strong><br>" + riskSummary
+                    + "</div>"
+                    + "<p>Current Health Index Score: <b>" + healthScore + " / 100</b></p>"
+                    + "<p>Please log in to the <b>Zoho Creator Parent Portal</b> to view detailed attendance logs, test mark breakdowns, and submit payment installments.</p>"
+                    + "<div style='text-align: center; margin: 25px 0;'>"
+                    + "<a href='https://creatorapp.zoho.com/school_admin/parent-portal' style='background-color: #0275d8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;'>Open Parent Portal</a>"
+                    + "</div>"
+                    + "<p>Warm regards,<br><b>Student Welfare & Academic Oversight Committee</b><br>St. Jude International School</p>"
+                    + "</div>"
+                    + "</div>"
+                    + "</body></html>";
+                
+                sendmail
+                [
+                    from : zoho.adminuserid
+                    to : parentEmail
+                    subject : emailSubject
+                    message : emailBody
+                ]
+                info "Dispatched Early Warning Alert to Parent Email: " + parentEmail;
+            }
+        } else {
+            // Clear Risk Flag if student is now performing well
+            updMap = Map();
+            updMap.put("At_Risk_Flag", false);
+            updMap.put("Student_Health_Score", healthScore);
+            updMap.put("Risk_Summary", "None");
+            zoho.crm.updateRecord("Students", stuId, updMap);
+        }
+    }
+}
+
+info "Proactive Risk Assessment Completed. Total At-Risk Students Flagged: " + atRiskCount;

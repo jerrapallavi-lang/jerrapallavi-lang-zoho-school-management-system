@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Parent Portal Dashboard Widget</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    body { background: #0b132b; color: #f8fafc; padding: 1.5rem; }
+    
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    
+    .card {
+      background: rgba(28, 37, 65, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .card.span-2 { grid-column: span 2; }
+    .card.span-3 { grid-column: span 3; }
+    
+    .card-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #64748b;
+      margin-bottom: 0.75rem;
+    }
+    
+    .student-header { display: flex; align-items: center; gap: 1.25rem; }
+    .avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; font-weight: 800; color: #0f172a;
+    }
+    
+    .metric-value { font-size: 2.2rem; font-weight: 800; color: #38bdf8; }
+    .metric-sub { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+
+    .status-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 0.8rem; font-weight: 700;
+    }
+    .status-badge.success { background: rgba(52, 211, 153, 0.2); color: #34d399; }
+    .status-badge.warning { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+    
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.9rem; }
+    th { color: #94a3b8; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard-grid">
+    
+    <!-- Student Summary Card -->
+    <div class="card span-2">
+      <div class="card-title">Student Profile</div>
+      <div class="student-header">
+        <div class="avatar">EV</div>
+        <div>
+          <h2 style="font-size: 1.4rem; font-weight: 700;">Eleanor Vance</h2>
+          <p class="metric-sub">Student ID: <code>STU-2026-1001</code> | Grade 10 - Section A</p>
+          <div style="margin-top: 8px;">
+            <span class="status-badge success">Enrolled & Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Gauge Card -->
+    <div class="card">
+      <div class="card-title">Overall Attendance</div>
+      <div class="metric-value">94.5%</div>
+      <p class="metric-sub">170 / 180 Days Present</p>
+    </div>
+
+    <!-- Exam Marks Summary Table -->
+    <div class="card span-2">
+      <div class="card-title">Recent Term 1 Exam Results</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Subject</th>
+            <th>Marks Scored</th>
+            <th>Max Marks</th>
+            <th>Percentage</th>
+            <th>Grade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Mathematics</td>
+            <td>92</td>
+            <td>100</td>
+            <td>92.0%</td>
+            <td><span class="status-badge success">A+</span></td>
+          </tr>
+          <tr>
+            <td>Physics</td>
+            <td>85</td>
+            <td>100</td>
+            <td>85.0%</td>
+            <td><span class="status-badge success">A</span></td>
+          </tr>
+          <tr>
+            <td>English Literature</td>
+            <td>88</td>
+            <td>100</td>
+            <td>88.0%</td>
+            <td><span class="status-badge success">A</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Fee Status Card -->
+    <div class="card">
+      <div class="card-title">Annual Fee Status</div>
+      <div class="metric-value" style="color: #34d399;">₹0.00</div>
+      <p class="metric-sub">Total Collected: ₹50,000.00 (Fully Paid)</p>
+      <div style="margin-top: 12px;">
+        <span class="status-badge success">Fee Paid</span>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,98 @@
+/* 
+================================================================================
+SCRIPT 02: ATTENDANCE DUPLICATE PREVENTION & ROLLUP PERCENTAGE CALCULATOR
+================================================================================
+Module: Attendance
+Trigger: Workflow Rule / Custom Function on Attendance Record Creation & Edit
+Purpose:
+  1. Prevents duplicate daily attendance entries for the same student on the same date.
+  2. Generates an immutable Unique Attendance Key (Student_ID + YYYYMMDD).
+  3. Re-calculates total attendance percentage for the student across all records.
+  4. Updates the 'Attendance_Percentage' field on the 'Students' record.
+================================================================================
+*/
+
+attendanceId = attendance_id.toLong();
+attendanceRec = zoho.crm.getRecordById("Attendance", attendanceId);
+
+studentObj = attendanceRec.get("Student");
+if (studentObj == null) {
+    info "No student associated with attendance record. Exiting.";
+    return;
+}
+
+studentId = studentObj.get("id").toLong();
+attendanceDate = attendanceRec.get("Attendance_Date");
+
+// Fetch Student details to get Student_ID string
+studentRec = zoho.crm.getRecordById("Students", studentId);
+stuCode = studentRec.get("Student_ID");
+
+// Step 1: Form Unique Key [STU-2026-1001_20260923]
+formattedDate = attendanceDate.toString("yyyyMMdd");
+attendanceKey = stuCode + "_" + formattedDate;
+
+// Step 2: Prevent Duplicate Attendance Check
+searchCriteria = "(Attendance_Key:equals:" + attendanceKey + ")";
+duplicateCheck = zoho.crm.searchRecords("Attendance", searchCriteria);
+
+isDuplicate = false;
+if (duplicateCheck != null && duplicateCheck.size() > 0) {
+    for each dup in duplicateCheck {
+        dupId = dup.get("id").toLong();
+        if (dupId != attendanceId) {
+            isDuplicate = true;
+            break;
+        }
+    }
+}
+
+if (isDuplicate) {
+    info "ERROR: Duplicate attendance detected for Student " + stuCode + " on " + attendanceDate + ". Deleting invalid record.";
+    // Delete duplicate record or throw custom exception
+    deleteResp = zoho.crm.deleteRecord("Attendance", attendanceId);
+    return;
+}
+
+// Update Key on current record if not set
+if (attendanceRec.get("Attendance_Key") != attendanceKey) {
+    updMap = Map();
+    updMap.put("Attendance_Key", attendanceKey);
+    updMap.put("Name", stuCode + " - " + attendanceDate);
+    zoho.crm.updateRecord("Attendance", attendanceId, updMap);
+}
+
+// Step 3: Recalculate Rollup Attendance Percentage for Student
+allAttendance = zoho.crm.searchRecords("Attendance", "(Student:equals:" + studentId + ")");
+
+totalDays = 0;
+presentDays = 0;
+
+if (allAttendance != null && allAttendance.size() > 0) {
+    totalDays = allAttendance.size();
+    for each record in allAttendance {
+        statusVal = record.get("Status");
+        if (statusVal == "Present" || statusVal == "Late") {
+            presentDays = presentDays + 1;
+        }
+    }
+}
+
+attendancePct = 100.0;
+if (totalDays > 0) {
+    attendancePct = ((presentDays.toDecimal() / totalDays.toDecimal()) * 100.0).round(2);
+}
+
+// Step 4: Update Student Rollup Percentage
+stuUpdateMap = Map();
+stuUpdateMap.put("Attendance_Percentage", attendancePct);
+
+// Flag At-Risk Status if below threshold (e.g. 75%)
+if (attendancePct < 75.0) {
+    stuUpdateMap.put("Attendance_Risk_Flag", true);
+} else {
+    stuUpdateMap.put("Attendance_Risk_Flag", false);
+}
+
+zoho.crm.updateRecord("Students", studentId, stuUpdateMap);
+info "Updated Student " + stuCode + " Rollup Attendance: " + attendancePct + "% (" + presentDays + "/" + totalDays + " Days)";

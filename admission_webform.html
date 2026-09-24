@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>St. Jude International School - Admission Enquiry Form</title>
+  <link rel="stylesheet" href="webform_styles.css">
+</head>
+<body>
+
+  <div class="container">
+    <div class="glass-card">
+      <div class="header">
+        <span class="badge">Academic Admissions 2026-2027</span>
+        <h1>Student Admission Enquiry</h1>
+        <p>Complete the form below to submit an official admission enquiry into Zoho CRM.</p>
+      </div>
+
+      <!-- Zoho CRM WebToLead Form -->
+      <form action="https://crm.zoho.com/crm/WebToLeadForm" method="POST" name="ZohoWebToLeadForm" onsubmit="return validateForm();">
+        
+        <!-- Zoho CRM Hidden Parameters (Configurable for User Instance) -->
+        <input type="text" style="display:none;" name="xnQsjsdp" value="YOUR_ZOHO_CRM_WEB_FORM_ENCRYPTED_ID_HERE">
+        <input type="hidden" name="zc_gad" id="zc_gad" value="">
+        <input type="text" style="display:none;" name="xmMsjsdp" value="YOUR_ZOHO_CRM_WEB_FORM_ACTION_KEY_HERE">
+        <input type="text" style="display:none;" name="actionType" value="TGVhZHM=">
+        <input type="text" style="display:none;" name="returnURL" value="http://localhost:8080/crm/webform/thank_you.html">
+
+        <div class="form-grid">
+          
+          <!-- Student First Name -->
+          <div class="form-group">
+            <label for="First_Name">Student First Name <span class="required">*</span></label>
+            <input type="text" id="First_Name" name="First Name" maxlength="40" required placeholder="e.g. Eleanor">
+          </div>
+
+          <!-- Student Last Name -->
+          <div class="form-group">
+            <label for="Last_Name">Student Last Name <span class="required">*</span></label>
+            <input type="text" id="Last_Name" name="Last Name" maxlength="80" required placeholder="e.g. Vance">
+          </div>
+
+          <!-- Parent / Guardian Name -->
+          <div class="form-group">
+            <label for="Parent_Name">Parent / Guardian Name <span class="required">*</span></label>
+            <input type="text" id="Parent_Name" name="Parent Name" maxlength="100" required placeholder="e.g. Robert Vance">
+          </div>
+
+          <!-- Date of Birth -->
+          <div class="form-group">
+            <label for="Date_of_Birth">Student Date of Birth <span class="required">*</span></label>
+            <input type="date" id="Date_of_Birth" name="Date of Birth" required>
+          </div>
+
+          <!-- Parent Email -->
+          <div class="form-group">
+            <label for="Email">Parent Email Address <span class="required">*</span></label>
+            <input type="email" id="Email" name="Email" maxlength="100" required placeholder="parent@example.com">
+          </div>
+
+          <!-- Parent Phone -->
+          <div class="form-group">
+            <label for="Phone">Parent Phone Number <span class="required">*</span></label>
+            <input type="tel" id="Phone" name="Phone" maxlength="30" required placeholder="+1 (555) 019-2834">
+          </div>
+
+          <!-- Grade Applied For -->
+          <div class="form-group full-width">
+            <label for="Grade_Applied">Grade Applied For <span class="required">*</span></label>
+            <select id="Grade_Applied" name="Grade Applied" required>
+              <option value="" disabled selected>-- Select Target Academic Grade --</option>
+              <option value="Grade 1">Grade 1</option>
+              <option value="Grade 2">Grade 2</option>
+              <option value="Grade 3">Grade 3</option>
+              <option value="Grade 4">Grade 4</option>
+              <option value="Grade 5">Grade 5</option>
+              <option value="Grade 6">Grade 6</option>
+              <option value="Grade 7">Grade 7</option>
+              <option value="Grade 8">Grade 8</option>
+              <option value="Grade 9">Grade 9</option>
+              <option value="Grade 10">Grade 10</option>
+              <option value="Grade 11">Grade 11</option>
+              <option value="Grade 12">Grade 12</option>
+            </select>
+          </div>
+
+          <!-- Lead Source (Hidden / Default) -->
+          <input type="hidden" name="Lead Source" value="School Webform">
+          <input type="hidden" name="Admission Status" value="Enquiry Received">
+
+          <!-- Additional Notes -->
+          <div class="form-group full-width">
+            <label for="Description">Special Academic Requirements / Notes</label>
+            <textarea id="Description" name="Description" placeholder="Provide any previous academic background, medical details, or specific queries..."></textarea>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="submit-btn">
+            <span>Submit Admission Enquiry</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </button>
+
+        </div>
+      </form>
+
+      <div class="footer-text">
+        🔒 Encrypted & Direct Ingestion into Zoho CRM Leads Module.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function validateForm() {
+      const email = document.getElementById('Email').value;
+      const phone = document.getElementById('Phone').value;
+      
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        alert('Please enter a valid email address.');
+        return false;
+      }
+      
+      if (phone.trim().length < 7) {
+        alert('Please enter a valid phone number.');
+        return false;
+      }
+      
+      return true;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+/* 
+================================================================================
+SCRIPT 03: EXAM MARKS CALCULATOR, GRADE ASSIGNMENT & GPA ROLLUP
+================================================================================
+Module: Student_Marks
+Trigger: Workflow Rule on Save / Edit of Student_Marks Record
+Purpose:
+  1. Validates obtained marks against maximum allowable marks.
+  2. Computes exact percentage score.
+  3. Assigns standard academic letter grade (A+, A, B, C, F) and Pass/Fail status.
+  4. Recalculates student's cumulative GPA / Overall Grade across all subject exams.
+  5. Updates overall student performance metrics in the 'Students' module.
+================================================================================
+*/
+
+marksId = mark_id.toLong();
+markRec = zoho.crm.getRecordById("Student_Marks", marksId);
+
+studentObj = markRec.get("Student");
+if (studentObj == null) {
+    info "No student linked to mark record. Exiting.";
+    return;
+}
+studentId = studentObj.get("id").toLong();
+
+marksObtained = ifNull(markRec.get("Marks_Obtained"), 0.0).toDecimal();
+maxMarks = ifNull(markRec.get("Max_Marks"), 100.0).toDecimal();
+
+// Step 1: Validation - Ensure Marks Obtained <= Max Marks
+if (maxMarks <= 0) {
+    maxMarks = 100.0;
+}
+if (marksObtained > maxMarks) {
+    info "WARNING: Marks Obtained (" + marksObtained + ") exceeds Max Marks (" + maxMarks + "). Capping at Max Marks.";
+    marksObtained = maxMarks;
+}
+
+// Step 2: Compute Percentage
+percentage = ((marksObtained / maxMarks) * 100.0).round(2);
+
+// Step 3: Determine Letter Grade & Pass/Fail Status
+letterGrade = "F";
+passStatus = "Fail";
+
+if (percentage >= 90.0) {
+    letterGrade = "A+";
+    passStatus = "Pass";
+} else if (percentage >= 80.0) {
+    letterGrade = "A";
+    passStatus = "Pass";
+} else if (percentage >= 70.0) {
+    letterGrade = "B";
+    passStatus = "Pass";
+} else if (percentage >= 50.0) {
+    letterGrade = "C";
+    passStatus = "Pass";
+} else if (percentage >= 40.0) {
+    letterGrade = "D";
+    passStatus = "Pass";
+} else {
+    letterGrade = "F";
+    passStatus = "Fail";
+}
+
+// Step 4: Update Current Student Marks Record
+markUpdateMap = Map();
+markUpdateMap.put("Marks_Obtained", marksObtained);
+markUpdateMap.put("Max_Marks", maxMarks);
+markUpdateMap.put("Percentage", percentage);
+markUpdateMap.put("Grade", letterGrade);
+markUpdateMap.put("Result_Status", passStatus);
+zoho.crm.updateRecord("Student_Marks", marksId, markUpdateMap);
+
+info "Mark Record Updated: " + percentage + "% | Grade: " + letterGrade + " | Status: " + passStatus;
+
+// Step 5: Cumulative Student Grade Rollup
+allMarks = zoho.crm.searchRecords("Student_Marks", "(Student:equals:" + studentId + ")");
+
+totalPctSum = 0.0;
+examCount = 0;
+failedExamsCount = 0;
+
+if (allMarks != null && allMarks.size() > 0) {
+    examCount = allMarks.size();
+    for each rec in allMarks {
+        recPct = ifNull(rec.get("Percentage"), 0.0).toDecimal();
+        recStatus = rec.get("Result_Status");
+        totalPctSum = totalPctSum + recPct;
+        if (recStatus == "Fail") {
+            failedExamsCount = failedExamsCount + 1;
+        }
+    }
+}
+
+avgPercentage = 0.0;
+if (examCount > 0) {
+    avgPercentage = (totalPctSum / examCount.toDecimal()).round(2);
+}
+
+// Overall Student Grade mapping
+overallGrade = "F";
+if (avgPercentage >= 90.0) {
+    overallGrade = "A+";
+} else if (avgPercentage >= 80.0) {
+    overallGrade = "A";
+} else if (avgPercentage >= 70.0) {
+    overallGrade = "B";
+} else if (avgPercentage >= 50.0) {
+    overallGrade = "C";
+} else {
+    overallGrade = "F";
+}
+
+// Step 6: Update Student Master Record
+studentUpdateMap = Map();
+studentUpdateMap.put("Overall_Grade", overallGrade);
+studentUpdateMap.put("Average_Marks_Percentage", avgPercentage);
+if (failedExamsCount > 0) {
+    studentUpdateMap.put("Academic_Risk_Flag", true);
+} else {
+    studentUpdateMap.put("Academic_Risk_Flag", false);
+}
+
+zoho.crm.updateRecord("Students", studentId, studentUpdateMap);
+info "Student Cumulative Performance Updated: Avg " + avgPercentage + "% | Overall Grade: " + overallGrade;

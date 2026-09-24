@@ -1,0 +1,124 @@
+/* 
+================================================================================
+SCRIPT 01: ADMISSION LEAD CONVERSION & AUTOMATED STUDENT ID GENERATION
+================================================================================
+Module: Leads
+Trigger: Workflow Rule on Lead Update when Admission_Status == 'Confirmed'
+Purpose:
+  1. Auto-generates a unique Student ID (Format: STU-YYYY-XXXX).
+  2. Creates a new record in the 'Students' custom module with mapped details.
+  3. Initializes default Fee Structure record in 'Student_Fees' module.
+  4. Triggers welcome notification email to the parent with login credentials instructions.
+================================================================================
+*/
+
+// Step 1: Retrieve Lead Record Details
+leadId = lead_id.toLong();
+leadRecord = zoho.crm.getRecordById("Leads", leadId);
+
+leadStatus = leadRecord.get("Admission_Status");
+if (leadStatus != "Confirmed") {
+    info "Lead is not confirmed yet. Skipping conversion.";
+    return;
+}
+
+// Check if student record already created to prevent duplication
+existingStudent = leadRecord.get("Associated_Student_ID");
+if (existingStudent != null && existingStudent != "") {
+    info "Student record already exists for this Lead: " + existingStudent;
+    return;
+}
+
+firstName = ifNull(leadRecord.get("First_Name"), "");
+lastName = ifNull(leadRecord.get("Last_Name"), "");
+fullName = (firstName + " " + lastName).trim();
+parentName = ifNull(leadRecord.get("Parent_Name"), "");
+parentEmail = ifNull(leadRecord.get("Email"), "");
+parentPhone = ifNull(leadRecord.get("Phone"), "");
+gradeApplied = ifNull(leadRecord.get("Grade_Applied"), "");
+dob = leadRecord.get("Date_of_Birth");
+
+// Step 2: Generate Unique Sequential Student ID (STU-2026-XXXX)
+currentYear = year(today()).toString();
+prefix = "STU-" + currentYear + "-";
+
+// Search existing students count to determine next sequence number
+searchResponse = zoho.crm.searchRecords("Students", "(Student_ID:starts_with:" + prefix + ")");
+seqNumber = 1001;
+if (searchResponse != null && searchResponse.size() > 0) {
+    seqNumber = 1000 + searchResponse.size() + 1;
+}
+studentID = prefix + seqNumber.toString();
+
+// Step 3: Find Lookup IDs for Current Academic Year & Class
+academicYearID = "";
+ayRecords = zoho.crm.searchRecords("Academic_Years", "(Is_Current:equals:true)");
+if (ayRecords != null && ayRecords.size() > 0) {
+    academicYearID = ayRecords.get(0).get("id");
+}
+
+classID = "";
+classRecords = zoho.crm.searchRecords("Classes", "(Name:equals:" + gradeApplied + ")");
+if (classRecords != null && classRecords.size() > 0) {
+    classID = classRecords.get(0).get("id");
+}
+
+// Step 4: Create Record in 'Students' Custom Module
+studentMap = Map();
+studentMap.put("Name", fullName);
+studentMap.put("Student_ID", studentID);
+studentMap.put("Parent_Name", parentName);
+studentMap.put("Parent_Email", parentEmail);
+studentMap.put("Parent_Phone", parentPhone);
+studentMap.put("Date_of_Birth", dob);
+studentMap.put("Enrollment_Date", today().toString("yyyy-MM-dd"));
+studentMap.put("Student_Status", "Active");
+studentMap.put("Attendance_Percentage", 100.0);
+studentMap.put("Fee_Status", "Pending");
+
+if (academicYearID != "") {
+    studentMap.put("Academic_Year", academicYearID);
+}
+if (classID != "") {
+    studentMap.put("Class", classID);
+}
+
+createStudentResp = zoho.crm.createRecord("Students", studentMap);
+newStudentID = createStudentResp.get("id");
+info "New Student Record Created with ID: " + studentID + " (CRM ID: " + newStudentID + ")";
+
+// Step 5: Initialize Annual Fee Structure for Admitted Student
+defaultTotalFee = 50000.00; // Base tuition fee
+dueDate = today().addMonths(1).toString("yyyy-MM-dd");
+
+feeMap = Map();
+feeMap.put("Name", "Annual Tuition Fee " + currentYear + " - " + studentID);
+feeMap.put("Student", newStudentID);
+if (academicYearID != "") {
+    feeMap.put("Academic_Year", academicYearID);
+}
+feeMap.put("Total_Fee_Amount", defaultTotalFee);
+feeMap.put("Amount_Collected", 0.00);
+feeMap.put("Outstanding_Balance", defaultTotalFee);
+feeMap.put("Fee_Status", "Pending");
+feeMap.put("Due_Date", dueDate);
+
+createFeeResp = zoho.crm.createRecord("Student_Fees", feeMap);
+info "Initial Fee Structure Created for Student: " + studentID;
+
+// Step 6: Update Lead Record with Converted Reference & Status
+leadUpdateMap = Map();
+leadUpdateMap.put("Admission_Status", "Admission Confirmed & Enrolled");
+leadUpdateMap.put("Associated_Student_ID", studentID);
+zoho.crm.updateRecord("Leads", leadId, leadUpdateMap);
+
+// Step 7: Send Welcome & Creator Parent Portal Access Email
+if (parentEmail != "") {
+    sendmail
+    [
+        from : zoho.adminuserid
+        to : parentEmail
+        subject : "Welcome to St. Jude International School - Admission Confirmed (" + studentID + ")"
+        message : "Dear " + parentName + ",<br><br>We are pleased to inform you that admission for <b>" + fullName + "</b> has been confirmed.<br><br><b>Student Details:</b><br>- Student ID: <b>" + studentID + "</b><br>- Grade: " + gradeApplied + "<br><br>You can now access our Parent Portal in Zoho Creator to view real-time attendance, exam results, and fee updates.<br><br>Portal Login Email: <b>" + parentEmail + "</b><br><br>Regards,<br>Admissions Office"
+    ]
+}

@@ -1,0 +1,63 @@
+/* 
+================================================================================
+SCRIPT 05: ZOHO CRM TO ZOHO CREATOR PARENT PORTAL REALTIME SYNC
+================================================================================
+Module: Students / Attendance / Student_Marks / Student_Fees
+Trigger: Workflow Rule on Create / Update in Zoho CRM
+Purpose:
+  1. Synchronizes updated student details, attendance, exam marks, and fee status
+     directly to Zoho Creator application components.
+  2. Ensures parents viewing the Creator application see zero-latency, real-time data.
+  3. Uses Zoho Creator API integration tasks (`zoho.creator.createRecord` / `updateRecord`).
+================================================================================
+*/
+
+studentId = student_id.toLong();
+studentRec = zoho.crm.getRecordById("Students", studentId);
+
+stuCode = studentRec.get("Student_ID");
+stuName = studentRec.get("Name");
+parentEmail = studentRec.get("Parent_Email");
+parentPhone = studentRec.get("Parent_Phone");
+attendancePct = ifNull(studentRec.get("Attendance_Percentage"), 100.0).toDecimal();
+overallGrade = ifNull(studentRec.get("Overall_Grade"), "A");
+feeStatus = ifNull(studentRec.get("Fee_Status"), "Pending");
+feeBalance = ifNull(studentRec.get("Outstanding_Fee_Balance"), 0.0).toDecimal();
+
+// Target Zoho Creator App Specifications
+ownerName = "school_admin";
+appName = "parent-portal";
+formName = "Student_Profile";
+
+// Step 1: Search Existing Record in Creator by Student ID
+searchCriteria = "(Student_ID == \"" + stuCode + "\")";
+creatorRecords = zoho.creator.getRecords(ownerName, appName, "All_Student_Profiles", searchCriteria, 1, 10, "creator_connection");
+
+creatorRecordId = "";
+if (creatorRecords != null && creatorRecords.get("code") == 3000) {
+    recordsList = creatorRecords.get("data");
+    if (recordsList != null && recordsList.size() > 0) {
+        creatorRecordId = recordsList.get(0).get("ID").toString();
+    }
+}
+
+// Step 2: Build Sync Payload Map
+payload = Map();
+payload.put("Student_ID", stuCode);
+payload.put("Full_Name", stuName);
+payload.put("Parent_Email", parentEmail);
+payload.put("Parent_Phone", parentPhone);
+payload.put("Attendance_Percentage", attendancePct);
+payload.put("Overall_Grade", overallGrade);
+payload.put("Fee_Status", feeStatus);
+payload.put("Outstanding_Balance", feeBalance);
+
+if (creatorRecordId != "") {
+    // Step 3: Update Existing Record in Creator
+    updateResp = zoho.creator.updateRecord(ownerName, appName, formName, creatorRecordId.toLong(), payload, Map(), "creator_connection");
+    info "Updated Creator Parent Portal Record ID " + creatorRecordId + " for Student " + stuCode;
+} else {
+    // Step 4: Create New Record in Creator
+    createResp = zoho.creator.createRecord(ownerName, appName, formName, payload, Map(), "creator_connection");
+    info "Created New Creator Parent Portal Record for Student " + stuCode + ": " + createResp;
+}

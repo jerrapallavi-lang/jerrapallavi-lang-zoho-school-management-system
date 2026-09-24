@@ -1,0 +1,94 @@
+/* 
+================================================================================
+SCRIPT 04: FEE PAYMENT INSTALLMENT & BALANCE TRACKER
+================================================================================
+Module: Fee_Payments
+Trigger: Workflow Rule / Custom Function on Fee_Payments Record Insert & Edit
+Purpose:
+  1. Recalculates total fee amount collected across multiple payment installments.
+  2. Computes the remaining outstanding balance.
+  3. Evaluates fee payment status (Paid, Partial, Overdue, Pending) based on balance & due date.
+  4. Syncs the current payment status and balance to the master 'Students' record.
+================================================================================
+*/
+
+paymentId = payment_id.toLong();
+paymentRec = zoho.crm.getRecordById("Fee_Payments", paymentId);
+
+feeObj = paymentRec.get("Student_Fee");
+if (feeObj == null) {
+    info "No parent Student Fee record associated with payment. Exiting.";
+    return;
+}
+feeId = feeObj.get("id").toLong();
+
+// Fetch Parent Fee Structure Record
+feeRec = zoho.crm.getRecordById("Student_Fees", feeId);
+
+totalFeeAmount = ifNull(feeRec.get("Total_Fee_Amount"), 0.0).toDecimal();
+dueDate = feeRec.get("Due_Date");
+studentObj = feeRec.get("Student");
+
+studentId = 0L;
+if (studentObj != null) {
+    studentId = studentObj.get("id").toLong();
+}
+
+// Step 1: Query All Payment Installments for this Fee Record
+paymentsList = zoho.crm.searchRecords("Fee_Payments", "(Student_Fee:equals:" + feeId + ")");
+
+totalCollected = 0.0;
+installmentCount = 0;
+
+if (paymentsList != null && paymentsList.size() > 0) {
+    installmentCount = paymentsList.size();
+    for each pay in paymentsList {
+        amt = ifNull(pay.get("Amount_Paid"), 0.0).toDecimal();
+        totalCollected = totalCollected + amt;
+    }
+}
+
+// Step 2: Calculate Outstanding Balance
+outstandingBalance = (totalFeeAmount - totalCollected).round(2);
+if (outstandingBalance < 0.0) {
+    outstandingBalance = 0.0; // Avoid negative balance
+}
+
+// Step 3: Determine Fee Status Logic
+feeStatus = "Pending";
+
+if (outstandingBalance <= 0.0 && totalFeeAmount > 0.0) {
+    feeStatus = "Paid";
+} else if (totalCollected > 0.0 && outstandingBalance > 0.0) {
+    feeStatus = "Partial";
+} else if (dueDate != null && today() > dueDate && outstandingBalance > 0.0) {
+    feeStatus = "Overdue";
+} else {
+    feeStatus = "Pending";
+}
+
+// Step 4: Update Student_Fees Parent Record
+feeUpdateMap = Map();
+feeUpdateMap.put("Amount_Collected", totalCollected);
+feeUpdateMap.put("Outstanding_Balance", outstandingBalance);
+feeUpdateMap.put("Fee_Status", feeStatus);
+feeUpdateMap.put("Installment_Count", installmentCount);
+zoho.crm.updateRecord("Student_Fees", feeId, feeUpdateMap);
+
+info "Fee Structure Updated: Collected " + totalCollected + " / " + totalFeeAmount + " | Balance: " + outstandingBalance + " | Status: " + feeStatus;
+
+// Step 5: Update Master Student Record
+if (studentId != 0L) {
+    studentUpdateMap = Map();
+    studentUpdateMap.put("Fee_Status", feeStatus);
+    studentUpdateMap.put("Outstanding_Fee_Balance", outstandingBalance);
+    
+    if (feeStatus == "Overdue") {
+        studentUpdateMap.put("Fee_Risk_Flag", true);
+    } else {
+        studentUpdateMap.put("Fee_Risk_Flag", false);
+    }
+    
+    zoho.crm.updateRecord("Students", studentId, studentUpdateMap);
+    info "Master Student Record Updated with Fee Status: " + feeStatus;
+}

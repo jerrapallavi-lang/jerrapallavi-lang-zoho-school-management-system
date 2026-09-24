@@ -1,0 +1,58 @@
+/* 
+================================================================================
+CREATOR DELUGE WORKFLOW: CREATOR TO CRM PAYMENT & ACKNOWLEDGMENT SYNC
+================================================================================
+App: Parent Portal (Zoho Creator)
+Form: Parent_Fee_Payments
+Trigger: On Success of Payment Submission
+Purpose:
+  1. Captures parent fee payment submission details in Creator.
+  2. Queries matching 'Students' & 'Student_Fees' records in Zoho CRM.
+  3. Creates a new 'Fee_Payments' record in Zoho CRM automatically.
+  4. Triggers CRM Fee Payment Tracker script to re-calculate outstanding balances.
+================================================================================
+*/
+
+stuCode = input.Student_ID;
+paidAmount = input.Payment_Amount;
+payMethod = input.Payment_Method;
+txnId = input.Transaction_Ref_ID;
+payDate = input.Payment_Date.toString("yyyy-MM-dd");
+
+info "Processing Creator Payment Sync for Student: " + stuCode + " | Amount: " + paidAmount;
+
+// Step 1: Search Matching Student in CRM
+crmStudents = zoho.crm.searchRecords("Students", "(Student_ID:equals:" + stuCode + ")");
+
+if (crmStudents == null || crmStudents.size() == 0) {
+    info "ERROR: Student ID " + stuCode + " not found in Zoho CRM.";
+    return;
+}
+
+studentCrmId = crmStudents.get(0).get("id").toLong();
+
+// Step 2: Search Matching Active Student Fee Record in CRM
+crmFees = zoho.crm.searchRecords("Student_Fees", "(Student:equals:" + studentCrmId + ")");
+
+if (crmFees == null || crmFees.size() == 0) {
+    info "ERROR: Fee structure for Student ID " + stuCode + " not found in Zoho CRM.";
+    return;
+}
+
+feeCrmId = crmFees.get(0).get("id").toLong();
+
+// Step 3: Create Fee_Payments Record in Zoho CRM
+paymentPayload = Map();
+paymentPayload.put("Name", "Receipt - " + txnId);
+paymentPayload.put("Student_Fee", feeCrmId);
+paymentPayload.put("Student", studentCrmId);
+paymentPayload.put("Amount_Paid", paidAmount);
+paymentPayload.put("Payment_Method", payMethod);
+paymentPayload.put("Transaction_ID", txnId);
+paymentPayload.put("Payment_Date", payDate);
+
+crmCreateResp = zoho.crm.createRecord("Fee_Payments", paymentPayload);
+info "Successfully Created Fee Payment Record in CRM: " + crmCreateResp.get("id");
+
+// Update status in Creator Form
+input.Status = "Verified";

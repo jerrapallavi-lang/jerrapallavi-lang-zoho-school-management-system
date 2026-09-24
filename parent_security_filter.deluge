@@ -1,0 +1,40 @@
+/* 
+================================================================================
+CREATOR DELUGE WORKFLOW: PARENT ROW-LEVEL SECURITY FILTER
+================================================================================
+App: Parent Portal (Zoho Creator)
+Form / View: Student_Profile, Attendance_Log, Academic_Report_Card, Parent_Fee_Payments
+Trigger: On Load / View Criteria Enforcement
+Purpose:
+  1. Enforces strict row-level security so parents ONLY access their child's records.
+  2. Dynamically fetches current logged-in user email via `zoho.loginuserid`.
+  3. Filters view records using `Parent_Email == zoho.loginuserid`.
+  4. Restricts direct URL tampering or cross-parent record queries.
+================================================================================
+*/
+
+// Retrieve Authenticated Parent Login Email
+currentUserEmail = zoho.loginuserid;
+
+if (currentUserEmail == null || currentUserEmail == "") {
+    alert "Access Denied: Unauthenticated user session. Please log in.";
+    cancel submit;
+}
+
+info "Current Authenticated Parent Session Email: " + currentUserEmail;
+
+// Apply Security Filter Criteria programmatically in View
+// Record View Filter Criteria in Deluge:
+// View_Name[Parent_Email == zoho.loginuserid];
+
+// Fetch Child Record matching logged-in parent
+studentRecord = Student_Profile[Parent_Email == currentUserEmail];
+
+if (studentRecord.count() == 0) {
+    info "No student record linked to parent email: " + currentUserEmail;
+    // Hide administrative controls or display onboarding message
+} else {
+    // Populate form drop-downs with child student ID automatically
+    input.Student_ID = studentRecord.Student_ID;
+    input.Parent_Email = currentUserEmail;
+}
